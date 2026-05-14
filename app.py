@@ -1,11 +1,15 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.security import check_password_hash, generate_password_hash
-from models import get_db
+from models import get_db, init_db, seed_data
 from datetime import date
 import random
 
 app = Flask(__name__)
 app.secret_key = 'couple-app-secret-key-2026'
+
+# 启动时自动初始化数据库和预置题目
+init_db()
+seed_data()
 
 
 # ── 登录校验 ──
