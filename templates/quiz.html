@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="quiz-page">
+    <a href="{{ url_for('home') }}" class="back-link">← 返回</a>
+    <h2 class="page-title">💕 默契大考验</h2>
+
+    <!-- 初始状态：开始按钮 -->
+    <div id="quiz-start" class="quiz-state">
+        <p class="quiz-desc">随机抽取 5 道题，看看你们有多少默契</p>
+        <button class="btn btn-primary btn-block" onclick="startQuiz()">开始挑战</button>
+    </div>
+
+    <!-- 答题中 -->
+    <div id="quiz-answering" class="quiz-state hidden">
+        <p class="quiz-progress">第 <span id="q-index">1</span> / <span id="q-total">5</span> 题</p>
+        <div class="question-card card">
+            <span class="quiz-category" id="q-category"></span>
+            <p class="question-text" id="q-text"></p>
+        </div>
+        <textarea id="q-answer" rows="3" placeholder="写下你的答案..." class="input"></textarea>
+        <button class="btn btn-primary btn-block" onclick="submitAnswer()">下一题</button>
+    </div>
+
+    <!-- 等待对方 -->
+    <div id="quiz-waiting" class="quiz-state hidden">
+        <div class="waiting-card card">
+            <span class="waiting-icon">⏳</span>
+            <p>你已经完成了，等 TA 答完一起揭晓答案～</p>
+        </div>
+    </div>
+
+    <!-- 结果 -->
+    <div id="quiz-results" class="quiz-state hidden">
+        <div class="score-card card">
+            <p class="score-number" id="result-score"></p>
+            <p class="score-comment" id="result-comment"></p>
+            <p class="score-detail" id="result-detail"></p>
+        </div>
+        <div id="result-list"></div>
+        <button class="btn btn-primary btn-block" onclick="restartQuiz()">再来一局</button>
+    </div>
+</div>
+
+<script>
+let currentSessionId = null;
+let currentQuestions = [];
+let currentIndex = 0;
+
+async function checkStatus() {
+    const res = await fetch('/api/quiz/status');
+    const data = await res.json();
+    return data;
+}
+
+async function startQuiz() {
+    // 创建/加入会话
+    const res = await fetch('/api/quiz/start', { method: 'POST' });
+    const data = await res.json();
+    currentSessionId = data.session_id;
+
+    if (data.joined) {
+        // 加入已有会话，直接跳到等待或答题
+        checkAndProceed();
+        return;
+    }
+
+    // 加载题目
+    const qres = await fetch(`/api/quiz/questions?session_id=${currentSessionId}`);
+    const qdata = await qres.json();
+    currentQuestions = qdata.questions;
+    currentIndex = 0;
+
+    showState('answering');
+    showQuestion();
+}
+
+async function checkAndProceed() {
+    const status = await checkStatus();
+    if (!status.has_session) {
+        showState('start');
+        return;
+    }
+    currentSessionId = status.session_id;
+
+    if (status.both_done) {
+        loadResults();
+        return;
+    }
+
+    if (status.my_done) {
+        showState('waiting');
+        return;
+    }
+
+    // 加载题目继续答
+    const qres = await fetch(`/api/quiz/questions?session_id=${currentSessionId}`);
+    const qdata = await qres.json();
+    currentQuestions = qdata.questions;
+
+    // 找到第一个没答的题
+    for (let i = 0; i < currentQuestions.length; i++) {
+        if (!currentQuestions[i].my_answer) {
+            currentIndex = i;
+            break;
+        }
+    }
+
+    showState('answering');
+    showQuestion();
+}
+
+function showQuestion() {
+    if (currentIndex >= currentQuestions.length) {
+        // 全部答完
+        checkCompleted();
+        return;
+    }
+    const q = currentQuestions[currentIndex];
+    document.getElementById('q-index').textContent = currentIndex + 1;
+    document.getElementById('q-total').textContent = currentQuestions.length;
+    document.getElementById('q-category').textContent = q.category;
+    document.getElementById('q-text').textContent = q.question;
+    document.getElementById('q-answer').value = q.my_answer || '';
+}
+
+async function submitAnswer() {
+    const answer = document.getElementById('q-answer').value.trim();
+    if (!answer) {
+        alert('写点什么吧～');
+        return;
+    }
+
+    const q = currentQuestions[currentIndex];
+    await fetch('/api/quiz/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            session_id: currentSessionId,
+            question_id: q.id,
+            answer: answer
+        })
+    });
+
+    currentIndex++;
+    if (currentIndex >= currentQuestions.length) {
+        checkCompleted();
+    } else {
+        showQuestion();
+    }
+}
+
+async function checkCompleted() {
+    const status = await checkStatus();
+    if (status.both_done) {
+        loadResults();
+    } else {
+        showState('waiting');
+        // 定时检查
+        pollResults();
+    }
+}
+
+function pollResults() {
+    const interval = setInterval(async () => {
+        const status = await checkStatus();
+        if (status.both_done) {
+            clearInterval(interval);
+            loadResults();
+        }
+    }, 3000);
+}
+
+async function loadResults() {
+    showState('results');
+    const res = await fetch(`/api/quiz/results?session_id=${currentSessionId}`);
+    const data = await res.json();
+
+    document.getElementById('result-score').textContent = data.score + '%';
+    document.getElementById('result-comment').textContent = data.comment;
+    document.getElementById('result-detail').textContent =
+        data.match_count + '/' + data.total + ' 题一致';
+
+    let html = '';
+    data.results.forEach((r, i) => {
+        const matchClass = r.match ? 'match' : 'no-match';
+        const icon = r.match ? '✅' : '❌';
+        html += `
+            <div class="result-item card ${matchClass}">
+                <p class="result-q">${icon} ${r.question}</p>
+                <div class="result-answers">
+                    <div class="result-mine"><span class="result-label">{{ session.emoji }} 我</span>${r.my_answer}</div>
+                    <div class="result-partner"><span class="result-label">{{ partner.emoji }} TA</span>${r.partner_answer}</div>
+                </div>
+            </div>
+        `;
+    });
+    document.getElementById('result-list').innerHTML = html;
+}
+
+function restartQuiz() {
+    currentSessionId = null;
+    currentQuestions = [];
+    currentIndex = 0;
+    showState('start');
+}
+
+function showState(state) {
+    document.querySelectorAll('.quiz-state').forEach(el => el.classList.add('hidden'));
+    document.getElementById('quiz-' + state).classList.remove('hidden');
+}
+
+// 页面加载时检查状态
+checkStatus().then(status => {
+    if (status.has_session && !status.both_done) {
+        currentSessionId = status.session_id;
+        checkAndProceed();
+    }
+});
+</script>
+{% endblock %}

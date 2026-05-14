@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="home-page">
+    <h2 class="page-title">今天想玩点什么？</h2>
+    <div class="feature-cards">
+        <a href="{{ url_for('daily') }}" class="feature-card">
+            <span class="feature-icon">📝</span>
+            <h3>每日一问</h3>
+            <p>每天一个问题，各自回答后一起揭晓</p>
+        </a>
+        <a href="{{ url_for('quiz_page') }}" class="feature-card">
+            <span class="feature-icon">💕</span>
+            <h3>默契大考验</h3>
+            <p>5 道题测测你们有多了解对方</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

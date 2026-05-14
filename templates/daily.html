@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="daily-page">
+    <a href="{{ url_for('home') }}" class="back-link">← 返回</a>
+    <h2 class="page-title">📝 每日一问</h2>
+
+    <div class="question-card card">
+        <p class="question-date">{{ question.date }}</p>
+        <p class="question-text">{{ question.question }}</p>
+    </div>
+
+    {% if both_ready %}
+    <div class="answers-reveal">
+        <div class="answer-card mine">
+            <p class="answer-label">{{ session.emoji }} 我的回答</p>
+            <p class="answer-text">{{ my_answer.answer }}</p>
+        </div>
+        <div class="answer-vs">VS</div>
+        <div class="answer-card partner">
+            <p class="answer-label">{{ partner.emoji }} {{ partner.display_name }}的回答</p>
+            <p class="answer-text">{{ partner_answer.answer }}</p>
+        </div>
+    </div>
+    {% elif my_answer %}
+    <div class="waiting-card card">
+        <span class="waiting-icon">⏳</span>
+        <p>你已经回答了，等 {{ partner.display_name }} 来回答吧～</p>
+        <p class="my-preview">我的回答：{{ my_answer.answer }}</p>
+    </div>
+    {% else %}
+    <form method="post" class="answer-form">
+        <textarea name="answer" rows="3" placeholder="写下你的答案..." required class="input"></textarea>
+        <button type="submit" class="btn btn-primary btn-block">提交</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>我们的空间</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        {% if session.user_id %}
+        <nav class="navbar">
+            <a href="{{ url_for('home') }}" class="nav-brand">💑 我们的空间</a>
+            <div class="nav-right">
+                <span class="nav-user">{{ session.emoji }} {{ session.display_name }}</span>
+                <a href="{{ url_for('logout') }}" class="nav-logout" onclick="return confirm('确定退出吗？')">退出</a>
+            </div>
+        </nav>
+        {% endif %}
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

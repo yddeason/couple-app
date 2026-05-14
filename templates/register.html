@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="form-page">
+    <div class="form-card">
+        <h1 class="form-title">📝 注册账号</h1>
+
+        {% if full %}
+        <p class="error">{{ error if error else '已有两个账号，无法再注册' }}</p>
+        <a href="{{ url_for('login') }}" class="btn btn-primary btn-block">返回登录</a>
+        {% else %}
+        <form method="post" class="form-fields">
+            <input type="text" name="username" placeholder="设置用户名（登录用）" required class="input">
+            <input type="password" name="password" placeholder="设置密码（至少4位）" required class="input" minlength="4">
+            <input type="text" name="display_name" placeholder="你的昵称（对方会看到）" required class="input">
+            <input type="text" name="emoji" placeholder="专属 emoji（如 💙）" value="💙" maxlength="2" class="input">
+            <hr class="form-divider">
+            <p class="form-hint">设置安全问题，用于找回密码</p>
+            <input type="text" name="security_question" placeholder="安全问题（如：我们第一次约会在哪？）" required class="input">
+            <input type="text" name="security_answer" placeholder="答案" required class="input">
+            {% if error %}
+            <p class="error">{{ error }}</p>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-block">注册</button>
+        </form>
+        {% endif %}
+
+        <p class="form-footer">
+            <a href="{{ url_for('login') }}">← 返回登录</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
