@@ -296,6 +296,17 @@ textarea.input {
     border-radius: 10px;
 }
 
+.waiting-hint {
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+    margin-top: 16px;
+    padding: 10px;
+    background: #fffbe6;
+    border-radius: 10px;
+    border: 1px solid #fff0b3;
+}
+
 .answer-form {
     margin-top: 8px;
 }

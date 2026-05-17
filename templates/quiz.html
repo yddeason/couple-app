@@ -42,6 +42,12 @@
 </div>
 
 <script>
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 let currentSessionId = null;
 let currentQuestions = [];
 let currentIndex = 0;
@@ -188,8 +194,8 @@ async function loadResults() {
             <div class="result-item card ${matchClass}">
                 <p class="result-q">${icon} ${r.question}</p>
                 <div class="result-answers">
-                    <div class="result-mine"><span class="result-label">{{ session.emoji }} 我</span>${r.my_answer}</div>
-                    <div class="result-partner"><span class="result-label">{{ partner.emoji }} TA</span>${r.partner_answer}</div>
+                    <div class="result-mine"><span class="result-label">{{ session.emoji }} 我</span>${escapeHtml(r.my_answer)}</div>
+                    <div class="result-partner"><span class="result-label">{{ partner.emoji }} TA</span>${escapeHtml(r.partner_answer)}</div>
                 </div>
             </div>
         `;

@@ -1,11 +1,17 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import get_db, init_db, seed_data
-from datetime import date
+from datetime import datetime, timezone, timedelta
 import random
 
 app = Flask(__name__)
 app.secret_key = 'couple-app-secret-key-2026'
+
+# 北京时间（UTC+8）
+CHINA_TZ = timezone(timedelta(hours=8))
+
+def today_str():
+    return datetime.now(CHINA_TZ).strftime('%Y-%m-%d')
 
 # 启动时自动初始化数据库和预置题目
 init_db()
@@ -157,7 +163,7 @@ def home():
 @login_required
 def daily():
     db = get_db()
-    today = str(date.today())
+    today = today_str()
 
     # 找到或创建今天的问题
     q = db.execute(
@@ -165,16 +171,14 @@ def daily():
     ).fetchone()
 
     if not q:
-        # 循环取题：按天数取模
         count = db.execute('SELECT COUNT(*) FROM daily_questions').fetchone()[0]
         if count == 0:
             db.close()
-            return '还没有题目，请先运行 init_db.py'
-        idx = date.today().toordinal() % count
+            return '还没有题目，请等待初始化完成'
+        idx = datetime.now(CHINA_TZ).toordinal() % count
         q = db.execute(
             'SELECT * FROM daily_questions LIMIT 1 OFFSET ?', (idx,)
         ).fetchone()
-        # 绑定到今天
         db.execute(
             'INSERT OR IGNORE INTO daily_questions (date, question) VALUES (?, ?)',
             (today, q['question'])
@@ -184,37 +188,41 @@ def daily():
             'SELECT * FROM daily_questions WHERE date = ?', (today,)
         ).fetchone()
 
-    # 自己和对方的回答
+    # 当前用户的回答
     my_answer = db.execute(
         'SELECT * FROM daily_answers WHERE question_id = ? AND user_id = ?',
         (q['id'], session['user_id'])
     ).fetchone()
 
+    # 对方信息
     partner = db.execute(
         'SELECT * FROM users WHERE id != ?', (session['user_id'],)
     ).fetchone()
-    partner_answer = db.execute(
-        'SELECT * FROM daily_answers WHERE question_id = ? AND user_id = ?',
-        (q['id'], partner['id'])
-    ).fetchone() if partner else None
 
     if request.method == 'POST':
         answer = request.form.get('answer', '').strip()
         if answer:
             db.execute(
-                'INSERT OR IGNORE INTO daily_answers (question_id, user_id, answer) VALUES (?, ?, ?)',
+                'INSERT OR REPLACE INTO daily_answers (question_id, user_id, answer) VALUES (?, ?, ?)',
                 (q['id'], session['user_id'], answer)
             )
             db.commit()
-            # 重新查询
             my_answer = db.execute(
                 'SELECT * FROM daily_answers WHERE question_id = ? AND user_id = ?',
                 (q['id'], session['user_id'])
             ).fetchone()
 
-    db.close()
+    # ✅ 只有当前用户已答完，才去查对方的回答；否则 partner_answer 始终为 None
+    partner_answer = None
+    both_ready = False
+    if my_answer and partner:
+        partner_answer = db.execute(
+            'SELECT * FROM daily_answers WHERE question_id = ? AND user_id = ?',
+            (q['id'], partner['id'])
+        ).fetchone()
+        both_ready = partner_answer is not None
 
-    both_ready = my_answer is not None and partner_answer is not None
+    db.close()
 
     return render_template('daily.html',
                            question=q,
@@ -264,23 +272,13 @@ def quiz_status():
         (s['id'], partner['id'])
     ).fetchone()[0]
 
-    total_qs = db.execute(
-        'SELECT COUNT(*) FROM quiz_answers WHERE session_id = ? GROUP BY question_id',
-        (s['id'],)
-    ).fetchone()
-    total_qs = db.execute(
-        'SELECT COUNT(DISTINCT question_id) FROM quiz_answers WHERE session_id = ?',
-        (s['id'],)
-    ).fetchone()[0]
-    # Actually let me get the session question count differently
     session_qs = db.execute(
         'SELECT DISTINCT question_id FROM quiz_answers WHERE session_id = ?',
         (s['id'],)
     ).fetchall()
     total = len(session_qs) if session_qs else 0
-    # If no answers yet, check if there's an active session
     if total == 0:
-        total = 5  # default
+        total = 5
 
     db.close()
 
